@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lightning Words ⚡ Vocabulary Quiz</title>
+  <style>
+    :root{
+      --bg:#0b1226;
+      --card:#111a3a;
+      --accent:#ffd84d;
+      --accent-2:#7cc9ff;
+      --accent-3:#ff7ca8;
+      --good:#34d399;
+      --bad:#f87171;
+      --text:#e8eeff;
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial;
+      background: radial-gradient(1200px 600px at 20% 10%, #14214e 0%, #0b1226 50%, #060a15 100%);
+      color:var(--text);
+      display:flex; align-items:center; justify-content:center; padding:24px;
+    }
+    .app{width:min(1100px, 100%);}
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:24px; box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      padding: clamp(16px, 3vw, 28px);
+    }
+
+    header{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
+    h1{font-size: clamp(22px, 3vw, 34px); margin:0;}
+    .subtitle{opacity:0.85; font-size: clamp(12px, 1.6vw, 14px)}
+
+    .hud{display:flex; gap:12px;}
+    .badge{
+      background: rgba(124,201,255,0.15);
+      border:1px solid rgba(124,201,255,0.35);
+      color:#cfeaff; padding:8px 12px; border-radius:999px; font-weight:600; font-size:14px;
+    }
+
+    .timer{position:relative; height:12px; width:100%; background:rgba(255,255,255,0.08); border-radius:999px; overflow:hidden; margin: 12px 0 18px;}
+    .timer > .bar{position:absolute; left:0; top:0; bottom:0; width:100%; background: linear-gradient(90deg, var(--accent), var(--accent-2));}
+
+    .question{text-align:center; margin:20px 0;}
+    .word{font-size: clamp(22px, 3vw, 30px); font-weight:800;}
+    .he{font-size: clamp(12px, 1.8vw, 14px); opacity:0.85;}
+
+    .grid{display:grid; grid-template-columns: repeat(3, minmax(160px,1fr)); gap: 16px;}
+    .option{
+      position:relative; aspect-ratio: 1 / 1; border-radius: 20px; cursor:pointer;
+      border:1px solid rgba(255,255,255,0.1);
+      background: linear-gradient(180deg, rgba(124,201,255,0.08), rgba(255,124,168,0.06));
+      display:flex; align-items:center; justify-content:center;
+      font-size:48px;
+      transition: transform .08s ease, box-shadow .2s ease;
+    }
+    .option:hover{ transform: translateY(-2px); box-shadow:0 8px 20px rgba(0,0,0,0.25);}
+    .option.correct{ outline: 3px solid var(--good);}
+    .option.wrong{ outline: 3px solid var(--bad);}
+
+    .status{text-align:center; font-weight:700; margin:10px 0;}
+    .status.ok{color:var(--good);}
+    .status.no{color:var(--bad);}
+  </style>
+</head>
+<body>
+  <div class="app card">
+    <header>
+      <div>
+        <h1>Lightning Words ⚡</h1>
+        <div class="subtitle">Fast-paced picture quiz for Grade 6</div>
+      </div>
+      <div class="hud">
+        <div class="badge" id="qBadge">Question 1/20</div>
+        <div class="badge" id="timeBadge">⏱ 10s</div>
+      </div>
+    </header>
+
+    <div class="timer"><div class="bar" id="timeBar"></div></div>
+
+    <section class="question">
+      <div class="word"><span id="word">—</span> <span class="he" id="he"> </span></div>
+      <div class="grid" id="grid"></div>
+    </section>
+
+    <div class="status" id="status"></div>
+
+    <div style="text-align:center;">
+      <button id="startBtn">Start</button>
+    </div>
+  </div>
+
+  <script>
+    const DATA = [
+      {word:"glad",he:"שמח",opts:["😀","🍕","🚗"],correct:0},
+      {word:"order",he:"להזמין / פקודה",opts:["🍽️","🎲","🧱"],correct:0},
+      {word:"team",he:"קבוצה",opts:["🤝","🌋","🐱"],correct:0},
+      {word:"anything",he:"כל דבר / משהו",opts:["❓","🧊","🚪"],correct:0},
+      {word:"pick",he:"לבחור",opts:["🖐️","🧺","🪄"],correct:0},
+      {word:"Dear ...",he:"יקר ...",opts:["💌","🪙","🧱"],correct:0},
+      {word:"island",he:"אי",opts:["🏝️","🏔️","🏜️"],correct:0},
+      {word:"million",he:"מיליון",opts:["1️⃣0️⃣0️⃣0️⃣0️⃣0️⃣0️⃣","🍀","🧊"],correct:0},
+      {word:"about",he:"בערך",opts:["ℹ️","🧭","📏"],correct:0},
+      {word:"famous",he:"מפורסם",opts:["⭐","💤","🍂"],correct:0},
+      {word:"reason",he:"סיבה",opts:["🧠","🎨","🪵"],correct:0},
+      {word:"several",he:"כמה / מספר",opts:["🔢","🎈","🧊"],correct:0},
+      {word:"thousand",he:"אלף",opts:["1️⃣0️⃣0️⃣0️⃣","🧃","🪁"],correct:0},
+      {word:"clever",he:"חכם",opts:["🦊","🪵","🧱"],correct:0},
+      {word:"mountain",he:"הר",opts:["🏔️","🏕️","🏚️"],correct:0},
+      {word:"return",he:"לחזור",opts:["🔁","🚫","🎁"],correct:0},
+      {word:"still",he:"עדיין",opts:["⏸️","🏃","🌪️"],correct:0},
+      {word:"decide",he:"להחליט",opts:["✅","🎲","🤷"],correct:0},
+      {word:"nature",he:"טבע",opts:["🌿","🏙️","🚗"],correct:0},
+      {word:"saw",he:"ראה",opts:["👀","🪚","👂"],correct:0},
+    ];
+
+    let index=0, score=0, timer=null;
+
+    const wordEl=document.getElementById('word');
+    const heEl=document.getElementById('he');
+    const gridEl=document.getElementById('grid');
+    const statusEl=document.getElementById('status');
+    const qBadge=document.getElementById('qBadge');
+    const timeBadge=document.getElementById('timeBadge');
+    const timeBar=document.getElementById('timeBar');
+    const startBtn=document.getElementById('startBtn');
+
+    function startGame(){
+      index=0; score=0;
+      startBtn.style.display='none';
+      nextQuestion();
+    }
+
+    function nextQuestion(){
+      clearInterval(timer);
+      if(index>=DATA.length){
+        wordEl.textContent='Done!';
+        heEl.textContent='';
+        gridEl.innerHTML='';
+        statusEl.textContent='Score: '+score+'/'+DATA.length;
+        startBtn.textContent='Play again';
+        startBtn.style.display='inline-block';
+        return;
+      }
+      const q=DATA[index];
+      wordEl.textContent=q.word;
+      heEl.textContent='('+q.he+')';
+      qBadge.textContent='Question '+(index+1)+'/'+DATA.length;
+
+      gridEl.innerHTML='';
+      q.opts.forEach((opt,i)=>{
+        const div=document.createElement('div');
+        div.className='option';
+        div.textContent=opt;
+        div.onclick=()=>check(i===q.correct,div);
+        gridEl.appendChild(div);
+      });
+      resetTimer();
+    }
+
+    function check(correct,div){
+      clearInterval(timer);
+      if(correct){
+        div.classList.add('correct');
+        statusEl.textContent='Correct!';
+        statusEl.className='status ok';
+        score++;
+        setTimeout(()=>{index++;nextQuestion();},600);
+      }else{
+        div.classList.add('wrong');
+        statusEl.textContent='Oops! Try again!';
+        statusEl.className='status no';
+      }
+    }
+
+    function resetTimer(){
+      let timeLeft=10;
+      timeBar.style.transition='none'; timeBar.style.width='100%';
+      setTimeout(()=>{timeBar.style.transition='width 10s linear'; timeBar.style.width='0%';},50);
+      timeBadge.textContent='⏱ 10s';
+      timer=setInterval(()=>{
+        timeLeft--;
+        timeBadge.textContent='⏱ '+timeLeft+'s';
+        if(timeLeft<=0){clearInterval(timer);statusEl.textContent='Time up!';statusEl.className='status no';}
+      },1000);
+    }
+
+    startBtn.onclick=startGame;
+  </script>
+</body>
+</html>
