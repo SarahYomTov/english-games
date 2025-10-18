@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Memory Match — Vocabulary (EN↔HE)</title>
+  <style>
+    :root{
+      --bg:#0b1226;          /* deep blue */
+      --panel:#111a3a;       /* darker blue */
+      --card:#162454;        /* card back */
+      --front:#0f1a3e;       /* card front */
+      --accent:#ffd84d;      /* yellow */
+      --good:#34d399;        /* green */
+      --bad:#f87171;         /* red */
+      --text:#e8eeff;        /* near-white */
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
+      background: radial-gradient(1200px 600px at 20% 10%, #14214e 0%, #0b1226 50%, #060a15 100%);
+      color:var(--text);
+      display:flex; align-items:center; justify-content:center; padding:16px;
+    }
+    .app{width:min(1200px,100%)}
+    .panel{
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:24px; box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      padding: clamp(14px, 2.6vw, 24px);
+    }
+    header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px}
+    h1{margin:0; font-size: clamp(22px, 3vw, 34px)}
+    .hud{display:flex; gap:10px; flex-wrap:wrap}
+    .badge{background: rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); padding:8px 12px; border-radius:999px; font-weight:700;}
+    .controls{display:flex; gap:8px; flex-wrap:wrap}
+    button{background:linear-gradient(90deg, var(--accent), #ff9bd2); color:#111; border:none; padding:10px 14px; border-radius:12px; font-weight:800; cursor:pointer}
+    button.secondary{background:rgba(255,255,255,.08); color:var(--text); border:1px solid rgba(255,255,255,.16)}
+
+    .grid{display:grid; gap:10px; grid-template-columns: repeat(5, minmax(120px,1fr));}
+    @media (max-width: 900px){ .grid{ grid-template-columns: repeat(4, minmax(100px,1fr)); } }
+    @media (max-width: 640px){ .grid{ grid-template-columns: repeat(3, minmax(90px,1fr)); } }
+
+    .card{
+      position:relative; aspect-ratio: 2/2.6; perspective: 900px; user-select:none;
+    }
+    .face{
+      position:absolute; inset:0; border-radius:16px; display:grid; place-items:center; padding:12px; text-align:center;
+      border:1px solid rgba(255,255,255,.12);
+      backface-visibility:hidden; transform-style:preserve-3d;
+      transition: transform .45s ease, box-shadow .2s ease, border-color .2s ease;
+    }
+    .back{ background: linear-gradient(180deg, var(--card), #0e1a40); font-weight:900; letter-spacing:1px; }
+    .front{ background: linear-gradient(180deg, var(--front), rgba(255,255,255,.02)); transform: rotateY(180deg); }
+    .text{ font-size: clamp(16px, 2.2vw, 24px); font-weight:800; line-height:1.2 }
+    .lang{ opacity:.8; font-size: .85em; margin-top:6px }
+
+    .card.flipped .back{ transform: rotateY(180deg) }
+    .card.flipped .front{ transform: rotateY(0) }
+    .card.matched .front{ outline:3px solid var(--good); box-shadow:0 0 20px rgba(52,211,153,.35) inset }
+
+    .footer{ display:flex; justify-content:space-between; align-items:center; margin-top:10px; opacity:.9 }
+    .good{ color:var(--good); font-weight:800 }
+    .bad{ color:var(--bad); font-weight:800 }
+
+    .toast{ position:fixed; left:50%; bottom:20px; transform:translateX(-50%); background:#101b3f; border:1px solid rgba(255,255,255,.12); padding:10px 14px; border-radius:12px; display:none }
+    .toast.show{ display:block }
+  </style>
+</head>
+<body>
+  <div class="app panel">
+    <header>
+      <div>
+        <h1>Memory Match — Vocabulary (EN↔HE)</h1>
+        <div style="opacity:.85">Match the English word with its Hebrew translation.</div>
+      </div>
+      <div class="controls">
+        <button id="startBtn">Start / Restart</button>
+        <button id="peekBtn" class="secondary" title="Peek at all cards for 3 seconds">Peek (3s)</button>
+      </div>
+    </header>
+
+    <div class="hud">
+      <div class="badge">Pairs: <span id="pairs">0/0</span></div>
+      <div class="badge">Moves: <span id="moves">0</span></div>
+      <div class="badge">Time: <span id="time">0:00</span></div>
+    </div>
+
+    <section class="grid" id="grid" aria-label="Memory cards"></section>
+
+    <div class="footer">
+      <div>Tip: You can edit the word list in the <code>PAIRS</code> constant.</div>
+      <div class="good" id="status"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Great memory! 🎉</div>
+
+<script>
+  // ================== DATA ==================
+  // Use the same vocabulary — each pair has a shared id.
+  const PAIRS = [
+    { id:'glad',     en:'glad',     he:'שמח' },
+    { id:'order',    en:'order',    he:'להזמין / פקודה' },
+    { id:'team',     en:'team',     he:'קבוצה' },
+    { id:'anything', en:'anything', he:'כל דבר / משהו' },
+    { id:'pick',     en:'pick',     he:'לבחור' },
+   
+    { id:'island',   en:'island',   he:'אי' },
+       { id:'about',    en:'about',    he:'בערך' },
+    { id:'famous',   en:'famous',   he:'מפורסם' },
+    { id:'reason',   en:'reason',   he:'סיבה' },
+    { id:'several',  en:'several',  he:'כמה / מספר' },
+    
+    { id:'clever',   en:'clever',   he:'חכם' },
+    { id:'mountain', en:'mountain', he:'הר' },
+    { id:'return',   en:'return',   he:'לחזור' },
+    { id:'still',    en:'still',    he:'עדיין' },
+    { id:'decide',   en:'decide',   he:'להחליט' },
+    { id:'nature',   en:'nature',   he:'טבע' },
+    { id:'saw',      en:'saw',      he:'ראה' },
+  ];
+
+  // Build a deck with two cards per pair (EN and HE)
+  function buildDeck(){
+    const deck = [];
+    PAIRS.forEach(p=>{
+      deck.push({ key:p.id+'-en', id:p.id, lang:'EN', text:p.en });
+      deck.push({ key:p.id+'-he', id:p.id, lang:'HE', text:p.he });
+    });
+    return shuffle(deck);
+  }
+
+  // ================== STATE ==================
+  let deck = [];
+  let first = null, second = null; // selected card nodes
+  let lock = false;                // prevent extra clicks during check
+  let moves = 0, matches = 0;      // counters
+  let timer = null, secs = 0;      // timer
+
+  // ================== DOM ==================
+  const gridEl = document.getElementById('grid');
+  const movesEl = document.getElementById('moves');
+  const pairsEl = document.getElementById('pairs');
+  const timeEl  = document.getElementById('time');
+  const statusEl= document.getElementById('status');
+  const toastEl = document.getElementById('toast');
+  document.getElementById('startBtn').addEventListener('click', start);
+  document.getElementById('peekBtn').addEventListener('click', peek);
+
+  // ================== HELPERS ==================
+  const shuffle = arr => arr.map(v=>[Math.random(),v]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
+  const fmt = s => `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+
+  function start(){
+    // reset state
+    deck = buildDeck();
+    gridEl.innerHTML = '';
+    first = second = null; lock = false; moves = 0; matches = 0; secs = 0;
+    movesEl.textContent = moves;
+    pairsEl.textContent = `0/${PAIRS.length}`;
+    statusEl.textContent = '';
+    clearInterval(timer); timeEl.textContent = fmt(0);
+    timer = setInterval(()=>{ secs++; timeEl.textContent = fmt(secs); }, 1000);
+
+    // render deck
+    deck.forEach(card => gridEl.appendChild(renderCard(card)));
+  }
+
+  function renderCard(card){
+    const wrapper = document.createElement('button');
+    wrapper.className = 'card';
+    wrapper.type='button';
+    wrapper.setAttribute('aria-label', `Card ${card.lang}`);
+    wrapper.dataset.id = card.id;
+    wrapper.dataset.key = card.key;
+
+    const back = document.createElement('div');
+    back.className = 'face back';
+    back.innerHTML = '<div class="text">⚡</div>';
+
+    const front = document.createElement('div');
+    front.className = 'face front';
+    front.innerHTML = `<div class="text">${card.text}</div><div class="lang">${card.lang}</div>`;
+
+    wrapper.appendChild(back); wrapper.appendChild(front);
+
+    wrapper.addEventListener('click', ()=> onFlip(wrapper));
+    return wrapper;
+  }
+
+  function onFlip(node){
+    if(lock || node.classList.contains('flipped') || node.classList.contains('matched')) return;
+    node.classList.add('flipped');
+
+    if(!first){ first = node; return; }
+    if(!second){
+      second = node; lock = true; moves++; movesEl.textContent = moves;
+      checkMatch();
+    }
+  }
+
+  function checkMatch(){
+    const samePair = first.dataset.id === second.dataset.id;
+    const differentCard = first.dataset.key !== second.dataset.key; // prevents double-click same card
+
+    if(samePair && differentCard){
+      // match
+      setTimeout(()=>{
+        first.classList.add('matched');
+        second.classList.add('matched');
+        resetPick();
+        matches++; pairsEl.textContent = `${matches}/${PAIRS.length}`;
+        if(matches === PAIRS.length){ finish(); }
+      }, 250);
+    } else {
+      // not a match
+      setTimeout(()=>{
+        first.classList.remove('flipped');
+        second.classList.remove('flipped');
+        resetPick();
+      }, 700);
+    }
+  }
+
+  function resetPick(){ first = null; second = null; lock = false; }
+
+  function finish(){
+    clearInterval(timer);
+    statusEl.textContent = `Well done! ${moves} moves — ${fmt(secs)}`;
+    toastEl.textContent = `Great memory! Finished in ${fmt(secs)} with ${moves} moves.`;
+    toastEl.classList.add('show');
+    setTimeout(()=> toastEl.classList.remove('show'), 3200);
+  }
+
+  function peek(){
+    // briefly reveal all
+    const cards = [...document.querySelectorAll('.card')];
+    cards.forEach(c=>c.classList.add('flipped'));
+    setTimeout(()=>{
+      cards.forEach(c=>{ if(!c.classList.contains('matched')) c.classList.remove('flipped'); });
+    }, 3000);
+  }
+
+  // start immediately on load
+  start();
+</script>
+</body>
+</html>
